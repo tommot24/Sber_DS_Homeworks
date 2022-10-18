@@ -1,0 +1,110 @@
+--1. Выберите заказчиков из Германии, Франции и Мадрида, выведите их название, страну и адрес.
+
+SELECT CustomerName, Country, City, Address FROM Customers
+where Country in ('Germany', 'France')
+or City like '%Madrid%'
+
+--2. Выберите топ 3 страны по количеству заказчиков, выведите их названия и количество записей.
+
+select count(customerID) as cnt, country from customers
+group by country
+order by cnt desc
+limit 3
+
+--3. Выберите перевозчика, который отправил 10-й по времени заказ, выведите его название, и дату отправления.
+
+select s.shipperName, o.orderDate from orders o join shippers s
+ON o.shipperID = s.shipperID
+order by orderDate desc
+limit 1 offset 9
+
+--4. Выберите самый дорогой заказ, выведите список товаров с их ценами.
+
+with max_order as (
+SELECT orderID, sum(p.price*od.Quantity) total_sum FROM [OrderDetails] od join products p
+ON od.productID = p.productID
+group by orderID
+order by total_sum desc
+limit 1)
+
+select od.orderID, p.ProductName, p.Price, od.Quantity
+from products p join OrderDetails od
+ON p.ProductID=od.ProductID
+where od.orderID in (select orderID from max_order)
+
+-- 5. Какой товар больше всего заказывали по количеству единиц товара, 
+-- выведите его название и количество единиц в каждом из заказов.
+with max_Quantity as(
+SELECT ProductID, sum(Quantity) total_Quantity
+FROM [OrderDetails]
+group by ProductID
+order by total_Quantity desc
+limit 1)
+
+select p.ProductName, od.OrderID, od.Quantity from OrderDetails od join products p
+ON od.ProductID = p.ProductID
+where od.ProductID in (select ProductID from max_Quantity)
+
+-- 6. Выведите топ 5 поставщиков по количеству заказов, выведите их названия, страну, контактное лицо и телефон.
+with top5_suppliers as(
+select p.supplierID, count(distinct od.orderID) as cnt
+from orderDetails od join products p
+ON od.productID = p.productID
+group by p.supplierID
+order by cnt desc
+limit 5)
+
+select SupplierName, Country, ContactName, Phone from suppliers
+where SupplierID in (select supplierID from top5_suppliers)
+
+-- 7. Какую категорию товаров заказывали больше всего по стоимости в Бразилии, выведите страну, название категории и сумму.
+with temp as (
+select c.country, CategoryID, sum(p.price*od.Quantity) total_sum
+from Customers c join Orders o
+ON c.CustomerID = o.CustomerID join OrderDetails od
+ON od.OrderID = o.OrderID join products p
+ON od.ProductID = p.ProductID
+where c.country = 'Brazil'
+group by c.country, p.CategoryID
+order by total_sum desc
+limit 1)
+
+select country, CategoryName, total_sum 
+from temp t join categories ct
+ON t.CategoryID = ct.CategoryID
+
+-- 8. Какая разница в стоимости между самым дорогим и самым дешевым заказом из США.
+with orders_total as (
+select o.orderID, sum(p.price*od.Quantity) as order_sum
+from Customers c join Orders o
+ON c.CustomerID = o.CustomerID join OrderDetails od
+ON od.OrderID = o.OrderID join products p
+ON od.ProductID = p.ProductID
+where c.country = 'USA'
+group by o.orderID)
+
+select
+
+(select order_sum from orders_total
+order by order_sum desc
+limit 1) - 
+(select order_sum from orders_total
+order by order_sum
+limit 1) as diff
+
+-- 9. Выведите количество заказов у каждого их трех самых молодых сотрудников, а также имя и фамилию во второй колонке.
+with young_emp as (
+SELECT EmployeeID, FirstName||' '||LastName Full_name FROM [Employees]
+order by BirthDate desc
+limit 3 )
+
+select count(OrderID) total_orders, y.Full_name from young_emp y join orders o
+ON y.EmployeeID = o.EmployeeID
+group by y.EmployeeID
+
+-- 10. Сколько банок крабового мяса всего было заказано.
+
+SELECT sum(SUBSTR(unit, 1, 2)*Quantity) as cnt_crab_meat_tins FROM Products p join OrderDetails od
+ON p.productID = od.productID
+where p.productName like '%Crab%'
+
